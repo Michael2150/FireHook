@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/FireHook/FireHook.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FireHook.Tests/FireHook.Tests.csproj" />
+  </Folder>
 </Solution>

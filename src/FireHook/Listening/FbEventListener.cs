@@ -12,6 +12,10 @@ public sealed class FbEventListener : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _reconnectLoop;
 
+    // Signals when QueueEvents has been called and the listener is live.
+    private readonly TaskCompletionSource _attached =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public FbEventListener(
         string connectionString,
         IEnumerable<string> eventNames,
@@ -24,11 +28,12 @@ public sealed class FbEventListener : IAsyncDisposable
         _reconnectDelay = reconnectDelay == default ? TimeSpan.FromSeconds(5) : reconnectDelay;
     }
 
-    public Task StartAsync(CancellationToken ct = default)
+    public async Task StartAsync(CancellationToken ct = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _reconnectLoop = RunWithReconnectAsync(_cts.Token);
-        return Task.CompletedTask;
+        // Wait until QueueEvents has been called before returning to the caller.
+        await _attached.Task.WaitAsync(ct);
     }
 
     public async Task StopAsync()
@@ -52,9 +57,10 @@ public sealed class FbEventListener : IAsyncDisposable
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // swallow connection errors and reconnect
+                _attached.TrySetException(ex);
+                // swallow and reconnect
             }
 
             if (!ct.IsCancellationRequested)
@@ -80,7 +86,9 @@ public sealed class FbEventListener : IAsyncDisposable
 
         re.RemoteEventError += (_, _) => errorTcs.TrySetResult();
 
+        await re.OpenAsync(ct);
         re.QueueEvents(_eventNames);
+        _attached.TrySetResult();
 
         await errorTcs.Task;
     }

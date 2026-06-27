@@ -72,3 +72,13 @@ await client.PublishAsync("order.created", payload);
 - At-least-once: rows are marked processed only after a successful dispatch
 - Use the event `Id` as an idempotency key in handlers
 - Dead-lettered rows (`PROCESSED = -1`) can be inspected or replayed manually
+
+## Tests
+
+```
+dotnet test                        # all tests
+dotnet test --filter "Unit"        # no database required
+dotnet test --filter "Integration" # requires a local Firebird instance
+```
+
+Integration tests create a fresh `.fdb` file at the start of the run and drop it on teardown. Set your Firebird credentials in `FirebirdFixture.cs` if they differ from the defaults (`SYSDBA` / `masterkey` on `localhost`).
