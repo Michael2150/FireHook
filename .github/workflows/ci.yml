@@ -15,9 +15,8 @@ jobs:
         image: jacobalberty/firebird:4.0
         env:
           ISC_PASSWORD: masterkey
-        ports:
-          - 3050:3050
         options: >-
+          --network host
           --health-cmd "nc -z localhost 3050"
           --health-interval 5s
           --health-timeout 5s
