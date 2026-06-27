@@ -16,8 +16,21 @@ public sealed class FirebirdFixture : IAsyncLifetime
         $"User=SYSDBA;Password=masterkey;Database={DbPath};" +
         "DataSource=localhost;Dialect=3;Charset=UTF8;";
 
-    public async Task InitializeAsync() =>
-        await FbConnection.CreateDatabaseAsync(ConnectionString, pageSize: 16384, overwrite: true);
+    public async Task InitializeAsync()
+    {
+        for (int attempt = 1; attempt <= 10; attempt++)
+        {
+            try
+            {
+                await FbConnection.CreateDatabaseAsync(ConnectionString, pageSize: 16384, overwrite: true);
+                return;
+            }
+            catch (FbException) when (attempt < 10)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(attempt));
+            }
+        }
+    }
 
     public async Task DisposeAsync()
     {
