@@ -8,7 +8,9 @@ public class FirebirdCollection : ICollectionFixture<FirebirdFixture> { }
 public sealed class FirebirdFixture : IAsyncLifetime
 {
     private static readonly string DbPath =
-        Path.Combine(Path.GetTempPath(), $"firehook_test_{Guid.NewGuid():N}.fdb");
+        Path.Combine(
+            Environment.GetEnvironmentVariable("FIREHOOK_TEST_DB_DIR") ?? Path.GetTempPath(),
+            $"firehook_test_{Guid.NewGuid():N}.fdb");
 
     public string ConnectionString { get; } =
         $"User=SYSDBA;Password=masterkey;Database={DbPath};" +

@@ -50,6 +50,8 @@ jobs:
           dotnet build --no-restore --configuration Release -p:Version=${{ github.event.inputs.version }}
 
       - name: Test
+        env:
+          FIREHOOK_TEST_DB_DIR: /firebird/data
         run: dotnet test --no-build --configuration Release
 
       - name: Pack
