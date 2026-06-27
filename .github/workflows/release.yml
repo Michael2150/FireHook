@@ -1,0 +1,89 @@
+name: Release
+
+# Trigger manually from Actions → Release → Run workflow.
+# Enter the version (e.g. 1.0.0) — the workflow tags the repo,
+# packs the NuGet, publishes to nuget.org, and creates a GitHub Release.
+#
+# Before first use, configure a Trusted Publishing policy on nuget.org:
+#   Repository Owner: <your GitHub username>
+#   Repository:       FireHook
+#   Workflow File:    release.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    services:
+      firebird:
+        image: jacobalberty/firebird:4.0
+        env:
+          ISC_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+        options: >-
+          --health-cmd "nc -z localhost 3050"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.x
+
+      - name: Restore & build
+        run: |
+          dotnet restore
+          dotnet build --no-restore --configuration Release -p:Version=${{ github.event.inputs.version }}
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Pack
+        run: |
+          dotnet pack src/FireHook/FireHook.csproj \
+            --no-build \
+            --configuration Release \
+            -p:Version=${{ github.event.inputs.version }} \
+            --output ./nupkg
+
+      - name: Tag & push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ github.event.inputs.version }}"
+          git push origin "v${{ github.event.inputs.version }}"
+
+      - name: NuGet login (OIDC)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet
+        run: |
+          dotnet nuget push ./nupkg/*.nupkg \
+            --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ github.event.inputs.version }}" \
+            ./nupkg/*.nupkg \
+            --title "v${{ github.event.inputs.version }}" \
+            --generate-notes
